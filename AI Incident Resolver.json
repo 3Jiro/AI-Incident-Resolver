@@ -1,0 +1,758 @@
+{
+  "name": "AI Incident Resolver",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/incident",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "427c2e6e-7c8c-4540-846d-61d8cd337eb4",
+      "name": "Webhook",
+      "webhookId": "abbcefc9-7366-44c8-9abf-e9e931100e62"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1869645d-f5ae-4d99-8523-28f471b3096b",
+                    "leftValue": "={{ $json.body.service }}",
+                    "rightValue": "auth-api",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c9f44477-22ad-4ccf-af00-4ff53f72e39e",
+                    "leftValue": "={{ $json.body.service }}",
+                    "rightValue": "payments-api",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "eb489ffd-aab0-4daf-b974-d46e73044706",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  metrics: {\n    cpu_usage: \"78%\",\n    memory_usage: \"62%\",\n    active_connections: 450,\n    error_rate_last_5m: \"5.2%\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        -464
+      ],
+      "id": "9b4782d2-3285-4399-8006-a310e8dd5ace",
+      "name": "Mock service health"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  recent_incidents: [\n    { id: \"INC-99\", date: \"2025-03-10\", issue: \"High Latency\", resolution: \"Restarted pods\" },\n    { id: \"INC-101\", date: \"2025-03-11\", issue: \"Auth Timeout\", resolution: \"Flushed Redis cache\" }\n  ]\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        -320
+      ],
+      "id": "0432ecf5-c232-4c15-9a73-cf5a76b93d0a",
+      "name": "Mock Recent incidents"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 3,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        688,
+        -336
+      ],
+      "id": "ac259f61-33f7-4b9d-9dbc-db897d96f9fe",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Please analyze the following incident and return the required JSON response:\n- Current Incident: {{ $json.metrics }}\n- Past History: {{ $json.recent_incidents }}\n- Rules to Follow: {{ $json.rules }}",
+        "options": {
+          "systemMessage": "=You are an AI Incident Resolver for the auth-api. \nYour goal is to analyze current metrics, past incidents, and runbook rules to decide the best course of action.\n\nDATA CONTEXT:\n- Metrics: {{ $json.metrics }}\n- History: {{ $json.recent_incidents }}\n- Runbook: {{ $json.rules }}\n\nDECISION LOGIC:\n1. If error_rate > 5% and CPU < 80%, suggest 'restart_pods'.\n2. If CPU > 90%, suggest 'scale_up'.\n3. If history shows this happened twice in 24h, suggest 'escalate'.\n\nYou MUST respond in valid JSON format only:\n{\n  \"action\": \"restart_pods\" | \"scale_up\" | \"escalate\",\n  \"reason\": \"Short explanation of why\",\n  \"confidence\": 0.0 to 1.0\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        880,
+        -320
+      ],
+      "id": "9f40545c-f6b7-46c2-9ccd-4d378caf0dc9",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -160
+      ],
+      "id": "33346f0c-1390-4898-a7a9-beb8b110cd9b",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "IYTeTOkVCsAMAg5v",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  rules: \"IF error_rate > 5% AND cpu < 80% THEN action = 'restart_pods'. IF cpu > 90% THEN action = 'scale_up'. ELSE 'escalate_to_slack'.\"\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        -176
+      ],
+      "id": "6c30e0b2-e4a8-4458-9301-d3438991a15a",
+      "name": "Mock Rule book"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the output string from the AI Agent\nlet rawOutput = $json.output;\n\n// Use Regex to find the JSON content between the backticks\nconst jsonRegex = /```json\\n([\\s\\S]*?)\\n```/;\nconst match = rawOutput.match(jsonRegex);\n\nif (match && match[1]) {\n  // Parse the extracted string into a real object\n  return JSON.parse(match[1]);\n} else {\n  // Fallback if the AI forgot the backticks or used a different format\n  try {\n    return JSON.parse(rawOutput);\n  } catch (e) {\n    return { action: \"error\", reason: \"Failed to parse AI output\" };\n  }\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -320
+      ],
+      "id": "f6c15f8b-f132-4efa-bf55-b3a80f2adb1a",
+      "name": "Cleaner"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "restart_pods",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "cac23d8b-0c5e-49b2-b2ee-f145fc405888"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "df56e58c-0d21-49c3-a3e8-fc79766911b2",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "scale_up",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2c71ccae-6f27-47d2-be63-aa08b6139f96",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "escalate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1376,
+        -336
+      ],
+      "id": "37a58089-faa6-4ef9-ac0d-e1af5351e91a",
+      "name": "action split"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0ALF5Y4267",
+          "mode": "list",
+          "cachedResultName": "all-n8n-test"
+        },
+        "messageType": "block",
+        "blocksUi": "={\n  \"blocks\": [\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Human Review Required*\\n*Reason:* {{ $json.reason }}\"\n      }\n    },\n    {\n      \"type\": \"actions\",\n      \"elements\": [\n        {\n          \"type\": \"button\",\n          \"text\": { \"type\": \"plain_text\", \"text\": \"Approve\" },\n          \"style\": \"primary\",\n          \"value\": \"approve\"\n        }\n      ]\n    }\n  ]\n}",
+        "text": "Urgent!🔔",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1600,
+        -144
+      ],
+      "id": "435c3647-6f35-486b-9815-02e16bc8f38a",
+      "name": "Human Review Needed",
+      "webhookId": "a00a7fce-470a-4b9f-b24a-cdf5e0086cbf",
+      "credentials": {
+        "slackApi": {
+          "id": "008VTzrNGbd0M0sF",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "54837edd-ff0f-42c3-93e0-604e0992f3ea",
+              "leftValue": "={{ $('Cleaner').item.json.confidence }}",
+              "rightValue": 0.95,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": false
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1600,
+        -496
+      ],
+      "id": "2806d904-9b41-4d33-998a-536a309942a5",
+      "name": "Restart (critical)"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        -320
+      ],
+      "id": "dc54faca-e76d-4bd3-8bcc-05b68913bad7",
+      "name": "Scale Up"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "XBlGiMFeAMhNo38C",
+          "mode": "list",
+          "cachedResultName": "incident resolver logs",
+          "cachedResultUrl": "/projects/lyYGQQxjxM1RKkpV/datatables/XBlGiMFeAMhNo38C"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "={{ $json.action }}",
+            "reason": "={{ $json.reason }}",
+            "confidence": "={{ $json.confidence }}",
+            "timestamp": "={{ $('Webhook').item.json.body.timestamp }}",
+            "service": "={{ $('Webhook').item.json.body.service }}",
+            "status": "pending"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        -48
+      ],
+      "id": "5fc9c89e-52e0-4abb-b54c-9af9afab3dce",
+      "name": "incident resolver logs"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1uGcdKarz_7TCBHI1b7qw3-326IF8VZSkHrYOlHnf6U0",
+          "mode": "list",
+          "cachedResultName": "n8n project",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uGcdKarz_7TCBHI1b7qw3-326IF8VZSkHrYOlHnf6U0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1463687341,
+          "mode": "list",
+          "cachedResultName": "Sheet4",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uGcdKarz_7TCBHI1b7qw3-326IF8VZSkHrYOlHnf6U0/edit#gid=1463687341"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Action": "={{ $json.action }}",
+            "Reason": "={{ $json.reason }}",
+            "Confidence": "={{ $json.confidence }}",
+            "Timestamp": "={{ $now }}",
+            "Service": "={{ $('Webhook').item.json.body.service }}"
+          },
+          "matchingColumns": [
+            "Service"
+          ],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Service",
+              "displayName": "Service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Action",
+              "displayName": "Action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Confidence",
+              "displayName": "Confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1248,
+        112
+      ],
+      "id": "a52e0cf8-32d4-4f9d-8dae-c9c67b7c0f0f",
+      "name": "incident resolver logs (sheets)",
+      "credentials": {
+        "googleApi": {
+          "id": "IYOOUqOdH8fK5JqS",
+          "name": "Google Service Account account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "marilu-pervious-ivette.ngrok-free.dev",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+            "content-length": "119",
+            "accept": "*/*",
+            "accept-encoding": "deflate, gzip",
+            "content-type": "application/json",
+            "x-forwarded-for": "64.227.21.251",
+            "x-forwarded-host": "marilu-pervious-ivette.ngrok-free.dev",
+            "x-forwarded-proto": "https",
+            "x-real-ip": "102.90.126.157"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "service": "auth-api",
+            "error": "5xx rate > 5%",
+            "timestamp": "2025-03-12T14:32:00Z",
+            "region": "us-east-1"
+          },
+          "webhookUrl": "https://marilu-pervious-ivette.ngrok-free.dev/webhook-test/incident",
+          "executionMode": "test"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "AI Agent": [
+      {
+        "json": {
+          "output": "```json\n{\n  \"action\": \"escalate\",\n  \"reason\": \"Two past incidents are recorded in the history, which triggers the escalation rule for repeated issues within the assumed 24-hour window, as per decision logic rule 3.\",\n  \"confidence\": 0.9\n}\n```"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Mock service health",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mock Recent incidents",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mock Rule book",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock service health": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Recent incidents": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Rule book": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Cleaner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleaner": {
+      "main": [
+        [
+          {
+            "node": "incident resolver logs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "action split",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "incident resolver logs (sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "action split": {
+      "main": [
+        [
+          {
+            "node": "Restart (critical)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Scale Up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Review Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restart (critical)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Human Review Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "36d914ff-39f4-4091-9c27-3613ad1607e5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "54b06315817fd07df4927ca7349fea37606eb75294a247e231fd9d13aa12f311"
+  },
+  "id": "XmoZn1YPoYRk2y8f",
+  "tags": []
+}
