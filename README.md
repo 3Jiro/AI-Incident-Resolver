@@ -1,6 +1,4 @@
 # 🛡️ AI Incident Resolver & Self-Healing Audit System
-
-# 🌟 Overview
 A "DevOps-in-a-Box" solution designed to automate Tier-1 incident response. This workflow monitors service webhooks, diagnoses the root cause using an LLM-powered "Rule Book" lookup, and executes corrective actions (Restarts/Scaling) autonomously.
 
 # 🛠️ Technical Architecture
