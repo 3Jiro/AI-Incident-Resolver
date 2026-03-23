@@ -14,6 +14,6 @@ A "DevOps-in-a-Box" solution designed to automate Tier-1 incident response. This
 - Regulatory Compliance: Designed the system to provide a full "Explanation of Action" in Slack, ensuring human oversight of every automated fix.
 
 # ⚙️ Tech stack
-- Primary Engine: n8n
+- *Primary Engine: n8n
 - AI/LLM: Google gemini / OpenAI
 - Data & storage: Google sheets 
